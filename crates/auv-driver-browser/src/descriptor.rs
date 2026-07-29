@@ -16,6 +16,7 @@ pub const BROWSER_CDP_CAPABILITIES: &[&str] = &[
   "browser.query-css",
   "browser.click-element",
   "browser.type-element-text",
+  "browser.set-file-input-files",
   "browser.scroll-page",
 ];
 
@@ -46,7 +47,7 @@ pub fn browser_driver_descriptor() -> BrowserDriverDescriptor {
   BrowserDriverDescriptor {
     id: "browser.cdp",
     platform: PlatformKind::Browser,
-    description: "Chromium browser driver: local headless launch or remote CDP connection, page lifecycle, DOM observation, screenshots, JSON evaluation, and protocol input.",
+    description: "Chromium browser driver: local headless launch or remote CDP connection, page lifecycle, DOM observation, screenshots, JSON evaluation, file inputs, and protocol input.",
   }
 }
 

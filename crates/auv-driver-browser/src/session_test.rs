@@ -8,6 +8,7 @@ use auv_driver_common::{Click, DriverError, DriverSession, InputDeliveryPath, Pl
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 use serde_json::{Value, json};
+use tempfile::NamedTempFile;
 use tungstenite::{Message, accept};
 
 use crate::{BrowserConnectOptions, BrowserDriver, CssSelector, NavigationOptions, PageCaptureOptions, PageRef};
@@ -50,6 +51,12 @@ fn public_browser_flow_uses_strict_dom_and_cdp_input_contracts() {
   assert_eq!(double_click.selected_path, InputDeliveryPath::CdpInput);
   let typed = session.dom().type_text(&element, "hello browser").unwrap();
   assert_eq!(typed.selected_path, InputDeliveryPath::CdpInput);
+  let upload_file = NamedTempFile::new().unwrap();
+  let file_input = session.dom().resolve(&page.reference, &CssSelector::new("input[type=\"file\"]").unwrap()).unwrap();
+  let uploaded = session.dom().set_file_input_files(&file_input, &[upload_file.path().to_path_buf()]).unwrap();
+  assert_eq!(uploaded.selected_path, InputDeliveryPath::CdpInput);
+  let wrong_element = session.dom().set_file_input_files(&element, &[upload_file.path().to_path_buf()]).unwrap_err();
+  assert!(wrong_element.to_string().contains("input type=\"file\""));
   let oversized_input = "x".repeat(1_024 * 1_024);
   let oversized_error = session.dom().type_text(&element, &oversized_input).unwrap_err();
   assert!(oversized_error.to_string().contains("request limit"));
@@ -97,6 +104,7 @@ fn public_browser_flow_uses_strict_dom_and_cdp_input_contracts() {
     "Runtime.evaluate",
     "Runtime.callFunctionOn",
     "DOM.querySelectorAll",
+    "DOM.setFileInputFiles",
     "Input.dispatchMouseEvent",
     "Input.insertText",
     "Page.captureScreenshot",
@@ -301,6 +309,11 @@ fn serve(listener: TcpListener) -> Vec<String> {
       | "DOM.scrollIntoViewIfNeeded"
       | "Runtime.releaseObject"
       | "Input.insertText" => json!({}),
+      "DOM.setFileInputFiles" => {
+        assert_eq!(request["params"]["backendNodeId"].as_u64(), Some(106));
+        assert_eq!(request["params"]["files"].as_array().map(Vec::len), Some(1));
+        json!({})
+      }
       "Input.dispatchMouseEvent" => {
         match request["params"]["type"].as_str() {
           Some("mouseMoved") => {
@@ -390,6 +403,13 @@ fn serve(listener: TcpListener) -> Vec<String> {
           let mut snapshot = dom_snapshot();
           snapshot["text"] = Value::String("x".repeat(2 * 1_024 * 1_024 + 1));
           json!({ "result": { "type": "object", "value": snapshot } })
+        } else if request["params"]["objectId"].as_str() == Some("object-106") {
+          let mut snapshot = dom_snapshot();
+          snapshot["tag_name"] = Value::String("input".to_string());
+          snapshot["text"] = Value::String(String::new());
+          snapshot["attributes"] = json!({ "type": "file", "multiple": "" });
+          snapshot["visible"] = Value::Bool(false);
+          json!({ "result": { "type": "object", "value": snapshot } })
         } else {
           json!({ "result": { "type": "object", "value": dom_snapshot() } })
         }
@@ -400,6 +420,7 @@ fn serve(listener: TcpListener) -> Vec<String> {
           ".many" => vec![2, 3],
           ".too-many" => (2..=130).collect(),
           ".too-large" => vec![5],
+          "input[type=\"file\"]" => vec![6],
           ".blocked" => vec![4],
           ".missing" => Vec::new(),
           _ => vec![2],

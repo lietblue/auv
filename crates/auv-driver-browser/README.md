@@ -17,6 +17,7 @@ Status: **v0, tested with a hermetic CDP transport**. This is not a
 - JSON-returning JavaScript evaluation
 - CSS-selector query, explicit element resolution, and wait
 - element click and text entry
+- hidden or visible `<input type="file">` selection without a native chooser
 - page scrolling
 - canonical `InputActionResult` values using the `cdp_input` delivery path
 
@@ -94,6 +95,9 @@ input delivery path. It does not prove that a website-level intent succeeded;
 the site operation above this driver must observe and verify that semantic
 postcondition. Likewise, `PageApi::evaluate` deliberately executes caller code
 in the page's main world and should be treated as a high-trust primitive.
+`DomApi::set_file_input_files` canonicalizes every path, accepts only existing
+regular files, and replaces the input's current selection. The site layer must
+still enforce its own file-count, media-type, size, and upload-completion rules.
 
 This crate currently has no CLI or MCP registration and does not integrate
 browser actions with AUV run recording or artifacts. It is Chromium/CDP-only;

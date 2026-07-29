@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Instant;
 
@@ -209,6 +210,41 @@ impl DomApi<'_> {
   pub fn type_text(&self, element: &DomElement, text: &str) -> DriverResult<InputActionResult> {
     self.session.backend.type_text(element, text)
   }
+
+  /// Replaces the selected files of an observed `<input type="file">`.
+  ///
+  /// Paths are canonicalized and must point to existing regular files. An
+  /// empty slice clears the current selection. At most 128 files can be
+  /// selected in one call. Chromium dispatches the corresponding file-input
+  /// events; this method does not open a native file chooser.
+  pub fn set_file_input_files(&self, element: &DomElement, files: &[PathBuf]) -> DriverResult<InputActionResult> {
+    if element.tag_name != "input" || !element.attributes.get("type").is_some_and(|value| value.eq_ignore_ascii_case("file")) {
+      return Err(DriverError::InvalidInput {
+        message: "browser file selection requires an observed <input type=\"file\"> element".to_string(),
+      });
+    }
+    if files.len() > 128 {
+      return Err(DriverError::InvalidInput {
+        message: "browser file selection supports at most 128 files per input".to_string(),
+      });
+    }
+    let files = files.iter().map(|path| canonical_file(path)).collect::<DriverResult<Vec<_>>>()?;
+    self.session.backend.set_file_input_files(element, &files)
+  }
+}
+
+fn canonical_file(path: &Path) -> DriverResult<String> {
+  let canonical = path.canonicalize().map_err(|error| DriverError::InvalidInput {
+    message: format!("browser upload file {} could not be resolved: {error}", path.display()),
+  })?;
+  if !canonical.is_file() {
+    return Err(DriverError::InvalidInput {
+      message: format!("browser upload path is not a regular file: {}", canonical.display()),
+    });
+  }
+  canonical.to_str().map(str::to_string).ok_or_else(|| DriverError::InvalidInput {
+    message: format!("browser upload file path is not valid UTF-8: {}", canonical.display()),
+  })
 }
 
 fn select_element(elements: Vec<DomElement>, selector: &CssSelector) -> DriverResult<DomElement> {

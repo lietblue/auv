@@ -10,4 +10,5 @@ fn descriptor_uses_browser_cdp_namespace() {
   assert_eq!(descriptor.platform, PlatformKind::Browser);
   assert!(BROWSER_CDP_CAPABILITIES.contains(&"browser.capture-page"));
   assert!(BROWSER_CDP_CAPABILITIES.contains(&"browser.click-element"));
+  assert!(BROWSER_CDP_CAPABILITIES.contains(&"browser.set-file-input-files"));
 }

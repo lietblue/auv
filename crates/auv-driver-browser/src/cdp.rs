@@ -190,6 +190,10 @@ impl CdpBackend {
     self.connection()?.type_text(element, text)
   }
 
+  pub(crate) fn set_file_input_files(&self, element: &DomElement, files: &[String]) -> DriverResult<InputActionResult> {
+    self.connection()?.set_file_input_files(element, files)
+  }
+
   pub(crate) fn scroll(&self, page: &PageRef, scroll: Scroll) -> DriverResult<InputActionResult> {
     self.connection()?.scroll(page, scroll)
   }
@@ -616,6 +620,21 @@ impl CdpConnection {
         "text": text,
       }),
     )?;
+    Ok(InputActionResult::single_success(InputDeliveryPath::CdpInput))
+  }
+
+  fn set_file_input_files(&mut self, element: &DomElement, files: &[String]) -> DriverResult<InputActionResult> {
+    self.ensure_element_current(&element.reference)?;
+    self
+      .call_page(
+        element.reference.page(),
+        "DOM.setFileInputFiles",
+        json!({
+          "files": files,
+          "backendNodeId": element.reference.backend_node_id(),
+        }),
+      )
+      .map_err(|error| stale_element(&element.reference, error))?;
     Ok(InputActionResult::single_success(InputDeliveryPath::CdpInput))
   }
 
