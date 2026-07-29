@@ -1,0 +1,27 @@
+[package]
+name = "auv-driver-browser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Chromium DevTools Protocol browser driver for AUV"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+autoexamples = false
+
+[[example]]
+name = "validate"
+path = "examples/validate.rs"
+
+[dependencies]
+auv-driver-common = { path = "../auv-driver-common" }
+base64.workspace = true
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tungstenite = { workspace = true, features = ["rustls-tls-native-roots"] }
+url.workspace = true

@@ -464,6 +464,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "auv-driver-browser"
+version = "0.0.1"
+dependencies = [
+ "auv-driver-common",
+ "base64",
+ "image",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tungstenite",
+ "url",
+]
+
+[[package]]
 name = "auv-driver-common"
 version = "0.0.1"
 dependencies = [
@@ -6352,6 +6366,9 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.4",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-pki-types",
  "sha1",
  "thiserror 2.0.18",
 ]

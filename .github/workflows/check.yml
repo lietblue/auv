@@ -48,6 +48,8 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --check
+      - run: cargo check --package auv-driver-browser --all-targets
+      - run: cargo test --package auv-driver-browser
       - run: cargo check
       - run: cargo test
       - run: cargo run --quiet -- invoke --help

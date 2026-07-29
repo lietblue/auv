@@ -264,6 +264,7 @@ pub enum InputDeliveryPath {
   WindowTargetedKeyboardScroll,
   ClipboardPaste,
   ForegroundSystemEvents,
+  CdpInput,
   Unsupported,
 }
 
@@ -282,6 +283,7 @@ impl InputDeliveryPath {
       Self::WindowTargetedKeyboardScroll => "window_targeted_keyboard_scroll",
       Self::ClipboardPaste => "clipboard_paste",
       Self::ForegroundSystemEvents => "foreground_system_events",
+      Self::CdpInput => "cdp_input",
       Self::Unsupported => "unsupported",
     }
   }

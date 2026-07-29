@@ -107,6 +107,7 @@ fn input_delivery_path_serde_matches_every_explicit_wire_value() {
     (InputDeliveryPath::WindowTargetedKeyboardScroll, "window_targeted_keyboard_scroll"),
     (InputDeliveryPath::ClipboardPaste, "clipboard_paste"),
     (InputDeliveryPath::ForegroundSystemEvents, "foreground_system_events"),
+    (InputDeliveryPath::CdpInput, "cdp_input"),
     (InputDeliveryPath::Unsupported, "unsupported"),
   ];
 

@@ -37,6 +37,12 @@ proven level, not a target. `not claimed` means no public level is asserted.
 | App-local recorded operation: TextEdit document write | `auv invoke app.textedit.document.write` | `live-validated` | `not claimed` | `not claimed` | [recorded parity tests](../crates/auv-cli/tests/textedit_document_write_parity.rs), [product integration](../crates/auv-cli/src/integrations/textedit/mod.rs), [live closure record](ai/references/apps/textedit/2026-07-13-textedit-document-write-live-closure.md) | Live closure was manually validated on one macOS environment (2026-07-15, `semantic_matched=true`). It is not an automated live regression gate, and `state_changed` remains `false` because no pre-write AX observation is recorded. Not yet `supported`. |
 | JS/TS and Python bindings | none | `not claimed` | `not claimed` | `not claimed` | [README planning statement](../README.md) | JS/TS and Python bindings are planned, not shipped. Native macOS Swift interop is an internal implementation boundary, not a public language binding. |
 
+## Library Driver Surface
+
+| Capability | Public surface | Browser target | Evidence | Known limit |
+| --- | --- | --- | --- | --- |
+| Chromium page and DOM automation | Rust crate `auv-driver-browser` | `tested` | [hermetic CDP session tests](../crates/auv-driver-browser/src/session_test.rs), [model tests](../crates/auv-driver-browser/src/model_test.rs), [implementation reference](ai/references/driver/2026-07-29-browser-driver-v0-implementation.md), [CI matrix](../.github/workflows/check.yml) | Library-only Chromium/CDP v0; no CLI, MCP, runtime recording, or live-browser claim. It contains no Douyin/TikTok business logic and no video or audio recording. |
+
 ## Reading This Matrix
 
 - A platform-specific crate or symbol is not a platform-support claim by itself.

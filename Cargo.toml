@@ -18,6 +18,7 @@ members = [
   "crates/auv-scan",
   "crates/auv-qqmusic",
   "crates/auv-driver",
+  "crates/auv-driver-browser",
   "crates/auv-driver-common",
   "crates/auv-driver-linux",
   "crates/auv-driver-macos",
@@ -67,6 +68,7 @@ repository.workspace = true
 autobins = false
 
 [workspace.dependencies]
+base64 = "0.22"
 bytes = "1"
 fs2 = "0.4"
 futures-core = "0.3"
@@ -81,6 +83,7 @@ thiserror = "2"
 tempfile = "3"
 time = { version = "0.3", features = ["formatting", "parsing"] }
 tungstenite = "0.29"
+url = "2"
 uuid = { version = "1", features = ["serde", "v7"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 leptess = "0.14"
