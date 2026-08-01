@@ -71,11 +71,13 @@ impl WaylandInputSession {
     let key = evdev_key_for_keysym(keysym)?;
     if key.implicit_shift {
       self.send_key(KEY_LEFTSHIFT, STATE_PRESSED);
+      self.send_modifiers(MOD_SHIFT);
     }
     self.send_key(key.code, STATE_PRESSED);
     self.send_key(key.code, STATE_RELEASED);
     if key.implicit_shift {
       self.send_key(KEY_LEFTSHIFT, STATE_RELEASED);
+      self.send_modifiers(0);
     }
     self.flush()
   }
@@ -83,21 +85,30 @@ impl WaylandInputSession {
   pub fn key_chord(&mut self, modifiers: &[i32], keysym: i32) -> DriverResult<()> {
     let key = evdev_key_for_keysym(keysym)?;
     let mut pressed = Vec::new();
+    let mut depressed_modifiers = 0;
     for keysym in modifiers {
       let modifier = evdev_key_for_keysym(*keysym)?;
       if !pressed.contains(&modifier.code) {
         self.send_key(modifier.code, STATE_PRESSED);
         pressed.push(modifier.code);
+        depressed_modifiers |= modifier_mask(modifier.code);
       }
     }
     if key.implicit_shift && !pressed.contains(&KEY_LEFTSHIFT) {
       self.send_key(KEY_LEFTSHIFT, STATE_PRESSED);
       pressed.push(KEY_LEFTSHIFT);
+      depressed_modifiers |= MOD_SHIFT;
+    }
+    if depressed_modifiers != 0 {
+      self.send_modifiers(depressed_modifiers);
     }
     self.send_key(key.code, STATE_PRESSED);
     self.send_key(key.code, STATE_RELEASED);
     for code in pressed.into_iter().rev() {
       self.send_key(code, STATE_RELEASED);
+    }
+    if depressed_modifiers != 0 {
+      self.send_modifiers(0);
     }
     self.flush()
   }
@@ -149,6 +160,10 @@ impl WaylandInputSession {
 
   fn send_key(&self, code: u32, state: u32) {
     self.keyboard.key(self.timestamp(), code, state);
+  }
+
+  fn send_modifiers(&self, depressed: u32) {
+    self.keyboard.modifiers(depressed, 0, 0, 0);
   }
 
   fn send_button(&self, button: MouseButton, state: u32) -> DriverResult<()> {
@@ -248,6 +263,20 @@ const KEY_LEFTALT: u32 = 56;
 const KEY_SPACE: u32 = 57;
 const KEY_DELETE: u32 = 111;
 const KEY_LEFTMETA: u32 = 125;
+const MOD_SHIFT: u32 = 1 << 0;
+const MOD_CONTROL: u32 = 1 << 2;
+const MOD_ALT: u32 = 1 << 3;
+const MOD_SUPER: u32 = 1 << 6;
+
+fn modifier_mask(code: u32) -> u32 {
+  match code {
+    KEY_LEFTSHIFT => MOD_SHIFT,
+    KEY_LEFTCTRL => MOD_CONTROL,
+    KEY_LEFTALT => MOD_ALT,
+    KEY_LEFTMETA => MOD_SUPER,
+    _ => 0,
+  }
+}
 
 fn evdev_key_for_keysym(keysym: i32) -> DriverResult<EvdevKey> {
   let (code, implicit_shift) = match keysym {
@@ -347,7 +376,7 @@ fn letter_key(value: u8) -> u32 {
 
 #[cfg(test)]
 mod tests {
-  use super::{KEY_LEFTSHIFT, ascii_evdev, evdev_key_for_keysym};
+  use super::{KEY_LEFTCTRL, KEY_LEFTSHIFT, MOD_CONTROL, MOD_SHIFT, ascii_evdev, evdev_key_for_keysym, modifier_mask};
 
   #[test]
   fn maps_ascii_and_implicit_shift() {
@@ -361,5 +390,12 @@ mod tests {
     let shift = evdev_key_for_keysym(0xffe1).unwrap();
     assert_eq!(shift.code, KEY_LEFTSHIFT);
     assert!(!shift.implicit_shift);
+  }
+
+  #[test]
+  fn maps_evdev_modifier_codes_to_xkb_masks() {
+    assert_eq!(modifier_mask(KEY_LEFTSHIFT), MOD_SHIFT);
+    assert_eq!(modifier_mask(KEY_LEFTCTRL), MOD_CONTROL);
+    assert_eq!(modifier_mask(47), 0);
   }
 }
