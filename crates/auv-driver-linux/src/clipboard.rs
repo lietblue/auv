@@ -6,8 +6,9 @@
 //! portal when those commands are unavailable.
 
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use auv_driver_common::error::DriverResult;
 
@@ -19,20 +20,88 @@ use crate::native::portal::{ClipboardSession as PortalClipboardSession, PortalCl
 #[derive(Debug)]
 pub(crate) enum ClipboardSession {
   Portal(PortalClipboardSession),
-  WaylandCommands,
+  WaylandCommands(WaylandClipboard),
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct WaylandClipboard {
+  owner: Option<Child>,
+}
+
+impl Drop for WaylandClipboard {
+  fn drop(&mut self) {
+    self.stop_owner();
+  }
+}
+
+impl WaylandClipboard {
+  fn open() -> DriverResult<Self> {
+    probe_wayland_commands()?;
+    Ok(Self::default())
+  }
+
+  fn snapshot(&self) -> DriverResult<String> {
+    wayland_snapshot()
+  }
+
+  fn set_text(&mut self, text: &str) -> DriverResult<()> {
+    self.stop_owner();
+
+    let mut child = Command::new("wl-copy")
+      .args(["--foreground", "--type", "text/plain;charset=utf-8"])
+      .stdin(Stdio::piped())
+      .stdout(Stdio::null())
+      .stderr(Stdio::piped())
+      .spawn()
+      .map_err(|error| backend(format!("failed to start wl-copy: {error}")))?;
+    let write_result = child.stdin.take().expect("wl-copy stdin was piped").write_all(text.as_bytes());
+    if let Err(error) = write_result {
+      let _ = child.kill();
+      let _ = child.wait();
+      return Err(backend(format!("failed to write text to wl-copy: {error}")));
+    }
+
+    // wl-copy must remain alive while it owns the selection. Give it a short
+    // window to fail (for example, when WAYLAND_DISPLAY is invalid), then keep
+    // the live owner in the session instead of waiting forever for it to exit.
+    std::thread::sleep(Duration::from_millis(25));
+    match child.try_wait() {
+      Ok(None) => {
+        self.owner = Some(child);
+        Ok(())
+      }
+      Ok(Some(status)) => {
+        let output = child.wait_with_output().map_err(|error| backend(format!("failed to collect wl-copy output: {error}")))?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(backend(format!("wl-copy exited with {status}; {}", stderr.trim())))
+      }
+      Err(error) => {
+        let _ = child.kill();
+        let _ = child.wait();
+        Err(backend(format!("failed to inspect wl-copy: {error}")))
+      }
+    }
+  }
+
+  fn stop_owner(&mut self) {
+    if let Some(mut owner) = self.owner.take() {
+      let _ = owner.kill();
+      let _ = owner.wait();
+    }
+  }
 }
 
 impl ClipboardSession {
   fn open() -> DriverResult<Self> {
     if prefers_native_wayland() {
       open_with_fallback(
-        ("wl-clipboard", || probe_wayland_commands().map(|()| Self::WaylandCommands)),
+        ("wl-clipboard", || WaylandClipboard::open().map(Self::WaylandCommands)),
         ("RemoteDesktop portal", || PortalClipboard::open().map(Self::Portal)),
       )
     } else {
       open_with_fallback(
         ("RemoteDesktop portal", || PortalClipboard::open().map(Self::Portal)),
-        ("wl-clipboard", || probe_wayland_commands().map(|()| Self::WaylandCommands)),
+        ("wl-clipboard", || WaylandClipboard::open().map(Self::WaylandCommands)),
       )
     }
   }
@@ -40,14 +109,14 @@ impl ClipboardSession {
   fn snapshot(&mut self) -> DriverResult<String> {
     match self {
       Self::Portal(session) => session.snapshot(),
-      Self::WaylandCommands => wayland_snapshot(),
+      Self::WaylandCommands(session) => session.snapshot(),
     }
   }
 
   fn set_text(&mut self, text: &str) -> DriverResult<()> {
     match self {
       Self::Portal(session) => session.set_text(text),
-      Self::WaylandCommands => wayland_set_text(text),
+      Self::WaylandCommands(session) => session.set_text(text),
     }
   }
 }
@@ -117,28 +186,6 @@ fn wayland_snapshot() -> DriverResult<String> {
     return Ok(String::new());
   }
   Err(backend(format!("wl-paste exited with {}; {}", output.status, stderr.trim())))
-}
-
-fn wayland_set_text(text: &str) -> DriverResult<()> {
-  let mut child = Command::new("wl-copy")
-    .args(["--type", "text/plain;charset=utf-8"])
-    .stdin(Stdio::piped())
-    .stdout(Stdio::null())
-    .stderr(Stdio::piped())
-    .spawn()
-    .map_err(|error| backend(format!("failed to start wl-copy: {error}")))?;
-  child
-    .stdin
-    .take()
-    .expect("wl-copy stdin was piped")
-    .write_all(text.as_bytes())
-    .map_err(|error| backend(format!("failed to write text to wl-copy: {error}")))?;
-  let output = child.wait_with_output().map_err(|error| backend(format!("failed to wait for wl-copy: {error}")))?;
-  if output.status.success() {
-    return Ok(());
-  }
-  let stderr = String::from_utf8_lossy(&output.stderr);
-  Err(backend(format!("wl-copy exited with {}; {}", output.status, stderr.trim())))
 }
 
 fn open_with_fallback(
