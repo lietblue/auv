@@ -2,8 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use auv_driver_common::{Driver, DriverDescriptor, DriverResult, DriverSession};
 
+use crate::clipboard::ClipboardSession;
 use crate::descriptor::{LinuxDriverDescriptor, linux_driver_descriptor};
-use crate::native::portal::{ClipboardSession, InputSession, ScreenCastSession};
+use crate::native::input::InputSession;
+use crate::native::portal::ScreenCastSession;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LinuxDriver;
@@ -25,11 +27,8 @@ pub struct LinuxDriverSession {
 
 #[derive(Debug, Default)]
 pub(crate) struct LinuxDriverSessionState {
-  // TODO(linux-portal-remote-desktop-shared-session): input and clipboard use
-  // separate RemoteDesktop sessions, so live validation still requests those
-  // permissions separately. Merge only after an owner-approved slice defines
-  // combined RequestClipboard/SelectDevices/Start and clipboard transfer
-  // thread ownership.
+  // Portal-backed desktops still use a distinct clipboard RemoteDesktop
+  // session. Niri stores a command-backed session marker here instead.
   pub(crate) clipboard_session: Option<ClipboardSession>,
   pub(crate) input_session: Option<InputSession>,
   pub(crate) screencast_session: Option<ScreenCastSession>,

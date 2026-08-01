@@ -3,9 +3,8 @@
 //! The first Linux slice is intentionally Wayland-friendly and capability
 //! oriented: it exposes shared driver/session types, records portal readiness,
 //! and validates live desktop capture through XDG desktop portal screenshots
-//! plus Wayland xdg-output display geometry.
-//! RemoteDesktop/libei input delivery is reserved until the portal session
-//! lifecycle is wired end to end.
+//! plus Wayland xdg-output display geometry. Input uses the RemoteDesktop
+//! portal where available and niri's virtual input protocols as a fallback.
 
 mod accessibility;
 #[cfg(target_os = "linux")]

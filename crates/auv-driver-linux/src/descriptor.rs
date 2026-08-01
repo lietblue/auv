@@ -2,9 +2,9 @@ use auv_driver_common::{DriverDescriptor, PlatformKind};
 
 /// Capabilities exposed by the Linux Wayland desktop driver slice.
 ///
-/// RemoteDesktop input is foreground portal input. Coordinate-targeted pointer
-/// clicks currently report a fallback reason when GNOME rejects absolute motion
-/// without a ScreenCast stream mapping.
+/// Input is foreground delivery through either RemoteDesktop or compositor
+/// virtual-input protocols. Coordinate-targeted pointer clicks report a
+/// fallback reason because Wayland does not provide background window input.
 pub const LINUX_DESKTOP_CAPABILITIES: &[&str] = &[
   "desktop.list-displays",
   "desktop.capture-display",
@@ -53,6 +53,6 @@ pub fn linux_driver_descriptor() -> LinuxDriverDescriptor {
   LinuxDriverDescriptor {
     id: "linux.desktop",
     platform: PlatformKind::Linux,
-    description: "Linux Wayland desktop driver: display capture, AT-SPI window/accessibility observation, Tesseract OCR, text clipboard, foreground portal input, and portal readiness probes.",
+    description: "Linux Wayland desktop driver: portal capture, AT-SPI window/accessibility observation, Tesseract OCR, text clipboard, RemoteDesktop input, niri virtual-input fallback, and portal readiness probes.",
   }
 }

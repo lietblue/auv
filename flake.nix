@@ -44,6 +44,7 @@
 
             buildInputs = with pkgs; [
               wayland
+              libxkbcommon
               libglvnd
               openssl
               pipewire

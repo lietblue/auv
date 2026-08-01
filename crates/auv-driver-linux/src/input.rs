@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::driver::LinuxDriverSessionState;
 use crate::error::invalid_input;
-use crate::native::portal::{InputSession, PortalInput};
+use crate::native::input::InputSession;
 use auv_driver_common::error::DriverResult;
 use auv_driver_common::geometry::Point;
 use auv_driver_common::input::{
@@ -130,7 +130,7 @@ fn with_input_session<T>(
 ) -> DriverResult<T> {
   let mut state = state.lock().expect("linux driver session state poisoned");
   if state.input_session.is_none() {
-    state.input_session = Some(PortalInput::open()?);
+    state.input_session = Some(InputSession::open()?);
   }
   operation(state.input_session.as_mut().expect("input session was just initialized"))
 }
@@ -248,7 +248,9 @@ mod keysym {
     match ch {
       '\n' | '\r' => Ok(RETURN),
       '\t' => Ok(TAB),
-      _ => Err(invalid_input(format!("linux portal keyboard input only supports ASCII text in this slice; unsupported character {ch:?}"))),
+      _ => Err(invalid_input(format!(
+        "linux virtual keyboard input only supports ASCII text in this slice; use paste_text for unsupported character {ch:?}"
+      ))),
     }
   }
 

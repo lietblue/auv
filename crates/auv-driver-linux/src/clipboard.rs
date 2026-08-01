@@ -1,15 +1,56 @@
-//! Text clipboard snapshot/restore/set through the XDG desktop portal.
+//! Text clipboard snapshot/restore/set for Linux Wayland desktops.
 //!
-//! Clipboard access is attached to a RemoteDesktop portal session. The public
-//! functions keep the same text-only contract as the other desktop drivers,
-//! while the portal session lifecycle is owned under `native::portal`.
+//! GNOME and other portal-backed desktops use the clipboard attached to an XDG
+//! RemoteDesktop session. Niri does not implement that portal, so it prefers
+//! the standard `wl-copy` / `wl-paste` command pair and falls back to the
+//! portal when those commands are unavailable.
 
+use std::io::Write;
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 
 use auv_driver_common::error::DriverResult;
 
 use crate::driver::LinuxDriverSessionState;
-use crate::native::portal::{ClipboardSession, PortalClipboard};
+use crate::error::backend;
+use crate::native::input::prefers_native_wayland;
+use crate::native::portal::{ClipboardSession as PortalClipboardSession, PortalClipboard};
+
+#[derive(Debug)]
+pub(crate) enum ClipboardSession {
+  Portal(PortalClipboardSession),
+  WaylandCommands,
+}
+
+impl ClipboardSession {
+  fn open() -> DriverResult<Self> {
+    if prefers_native_wayland() {
+      open_with_fallback(
+        ("wl-clipboard", || probe_wayland_commands().map(|()| Self::WaylandCommands)),
+        ("RemoteDesktop portal", || PortalClipboard::open().map(Self::Portal)),
+      )
+    } else {
+      open_with_fallback(
+        ("RemoteDesktop portal", || PortalClipboard::open().map(Self::Portal)),
+        ("wl-clipboard", || probe_wayland_commands().map(|()| Self::WaylandCommands)),
+      )
+    }
+  }
+
+  fn snapshot(&mut self) -> DriverResult<String> {
+    match self {
+      Self::Portal(session) => session.snapshot(),
+      Self::WaylandCommands => wayland_snapshot(),
+    }
+  }
+
+  fn set_text(&mut self, text: &str) -> DriverResult<()> {
+    match self {
+      Self::Portal(session) => session.set_text(text),
+      Self::WaylandCommands => wayland_set_text(text),
+    }
+  }
+}
 
 /// Reads the current clipboard text. Returns an empty string when the active
 /// clipboard owner has no `text/plain;charset=utf-8` payload.
@@ -37,7 +78,81 @@ fn with_clipboard_session<T>(
 ) -> DriverResult<T> {
   let mut state = state.lock().expect("linux driver session state poisoned");
   if state.clipboard_session.is_none() {
-    state.clipboard_session = Some(PortalClipboard::open()?);
+    state.clipboard_session = Some(ClipboardSession::open()?);
   }
   operation(state.clipboard_session.as_mut().expect("clipboard session was just initialized"))
+}
+
+fn probe_wayland_commands() -> DriverResult<()> {
+  for program in ["wl-copy", "wl-paste"] {
+    let status = Command::new(program)
+      .arg("--version")
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status()
+      .map_err(|error| backend(format!("failed to start {program}: {error}")))?;
+    if !status.success() {
+      return Err(backend(format!("{program} --version exited with {status}")));
+    }
+  }
+  Ok(())
+}
+
+fn wayland_snapshot() -> DriverResult<String> {
+  let output = Command::new("wl-paste")
+    .arg("--no-newline")
+    .stdin(Stdio::null())
+    .output()
+    .map_err(|error| backend(format!("failed to start wl-paste: {error}")))?;
+  if output.status.success() {
+    return String::from_utf8(output.stdout).map_err(|error| backend(format!("wl-paste returned non-UTF-8 text: {error}")));
+  }
+
+  let stderr = String::from_utf8_lossy(&output.stderr);
+  let diagnostic = stderr.to_ascii_lowercase();
+  if diagnostic.contains("nothing is copied") || diagnostic.contains("no selection") {
+    // No selection or no matching text MIME is the clipboard API's documented
+    // empty-string case.
+    return Ok(String::new());
+  }
+  Err(backend(format!("wl-paste exited with {}; {}", output.status, stderr.trim())))
+}
+
+fn wayland_set_text(text: &str) -> DriverResult<()> {
+  let mut child = Command::new("wl-copy")
+    .args(["--type", "text/plain;charset=utf-8"])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::null())
+    .stderr(Stdio::piped())
+    .spawn()
+    .map_err(|error| backend(format!("failed to start wl-copy: {error}")))?;
+  child
+    .stdin
+    .take()
+    .expect("wl-copy stdin was piped")
+    .write_all(text.as_bytes())
+    .map_err(|error| backend(format!("failed to write text to wl-copy: {error}")))?;
+  let output = child.wait_with_output().map_err(|error| backend(format!("failed to wait for wl-copy: {error}")))?;
+  if output.status.success() {
+    return Ok(());
+  }
+  let stderr = String::from_utf8_lossy(&output.stderr);
+  Err(backend(format!("wl-copy exited with {}; {}", output.status, stderr.trim())))
+}
+
+fn open_with_fallback(
+  first: (&str, impl FnOnce() -> DriverResult<ClipboardSession>),
+  second: (&str, impl FnOnce() -> DriverResult<ClipboardSession>),
+) -> DriverResult<ClipboardSession> {
+  match (first.1)() {
+    Ok(session) => Ok(session),
+    Err(first_error) => match (second.1)() {
+      Ok(session) => Ok(session),
+      Err(second_error) => Err(backend(format!(
+        "failed to open Linux clipboard session; {} failed: {}; {} failed: {}",
+        first.0, first_error, second.0, second_error
+      ))),
+    },
+  }
 }

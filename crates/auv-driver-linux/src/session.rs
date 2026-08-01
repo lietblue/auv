@@ -193,15 +193,15 @@ impl WindowApi<'_> {
     }
     // TODO(linux-window-targeted-background-input): `window_strategy` is a
     // macOS background-routing selector. Linux currently has only foreground
-    // RemoteDesktop portal delivery; revisit if a compositor or portal exposes
-    // verified window-targeted pointer delivery.
+    // portal or compositor virtual-input delivery; revisit if a compositor or
+    // portal exposes verified window-targeted pointer delivery.
     let _ = options.window_strategy;
     let screen_point = self.to_screen_point(window, point)?.point();
     let mut result = self.session.input().click_at(screen_point, options.click)?;
     add_foreground_window_fallback_reason(
       &mut result,
       InputDeliveryPath::WindowTargetedMouse,
-      "linux window.click used foreground RemoteDesktop portal input; Wayland window-targeted background pointer delivery is not available in this slice",
+      "linux window.click used foreground Linux input; Wayland window-targeted background pointer delivery is not available in this slice",
     );
     Ok(result)
   }
@@ -222,7 +222,7 @@ impl WindowApi<'_> {
     add_foreground_window_fallback_reason(
       &mut result,
       InputDeliveryPath::WindowTargetedWheel,
-      "linux window.scroll used foreground RemoteDesktop portal input; Wayland window-targeted background wheel delivery is not available in this slice",
+      "linux window.scroll used foreground Linux input; Wayland window-targeted background wheel delivery is not available in this slice",
     );
     Ok(result)
   }
@@ -309,20 +309,20 @@ impl InputApi<'_> {
     press_key(&self.session.state, options)
   }
 
-  /// Issues Ctrl+C against the current foreground target through the
-  /// RemoteDesktop portal.
+  /// Issues Ctrl+C against the current foreground target through the selected
+  /// Linux input backend.
   pub fn copy(&self) -> DriverResult<()> {
     copy(&self.session.state)
   }
 
-  /// Issues Ctrl+V against the current foreground target through the
-  /// RemoteDesktop portal.
+  /// Issues Ctrl+V against the current foreground target through the selected
+  /// Linux input backend.
   pub fn paste(&self) -> DriverResult<()> {
     paste(&self.session.state)
   }
 
   /// Temporarily installs text on the Wayland clipboard, pastes it through the
-  /// RemoteDesktop portal, and restores the prior text snapshot.
+  /// selected Linux input backend, and restores the prior text snapshot.
   pub fn paste_text(&self, options: PasteTextOptions) -> DriverResult<InputActionResult> {
     paste_text(&self.session.state, options)
   }

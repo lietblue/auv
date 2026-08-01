@@ -25,6 +25,10 @@ serde.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 leptess.workspace = true
 pipewire = "0.8"
+tempfile.workspace = true
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+xkbcommon = { version = "0.9", default-features = false }
 zbus.workspace = true

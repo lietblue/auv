@@ -1,5 +1,43 @@
 #[cfg(target_os = "linux")]
+pub mod input;
+#[cfg(target_os = "linux")]
 pub mod portal;
+
+#[cfg(not(target_os = "linux"))]
+pub mod input {
+  use auv_driver_common::error::{DriverError, DriverResult};
+  use auv_driver_common::geometry::Point;
+  use auv_driver_common::input::{Click, Scroll};
+
+  #[derive(Debug, Default)]
+  pub struct InputSession;
+
+  pub(crate) fn prefers_native_wayland() -> bool {
+    false
+  }
+
+  impl InputSession {
+    pub fn open() -> DriverResult<Self> {
+      Err(DriverError::unsupported("linux.input"))
+    }
+
+    pub fn click_at(&mut self, _point: Point, _click: Click) -> DriverResult<()> {
+      Err(DriverError::unsupported("linux.input"))
+    }
+
+    pub fn scroll_at(&mut self, _point: Point, _scroll: Scroll) -> DriverResult<()> {
+      Err(DriverError::unsupported("linux.input"))
+    }
+
+    pub fn key_press(&mut self, _keysym: i32) -> DriverResult<()> {
+      Err(DriverError::unsupported("linux.input"))
+    }
+
+    pub fn key_chord(&mut self, _modifiers: &[i32], _key: i32) -> DriverResult<()> {
+      Err(DriverError::unsupported("linux.input"))
+    }
+  }
+}
 
 #[cfg(not(target_os = "linux"))]
 pub mod portal {
